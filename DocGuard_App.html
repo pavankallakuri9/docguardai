@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DocGuard AI — Document Forensics</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d14;--surface:#111520;--surface2:#171c2b;--surface3:#1e2438;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --accent:#00e5a0;--red:#ff4d4d;--yellow:#ffb830;
+  --text:#eef0f6;--text2:#8892aa;--text3:#4e5a72;
+  --radius:14px;--radius-sm:8px;
+  --font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 40% at 50% -10%,rgba(61,123,255,0.1) 0%,transparent 70%);}
+
+header{padding:20px 40px;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;justify-content:space-between;background:var(--surface);}
+.logo{font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--accent);}
+.logo span{color:var(--text2);font-weight:400;}
+.badge{font-size:10px;padding:3px 10px;border-radius:20px;
+  border:1px solid var(--border2);color:var(--text3);font-family:var(--font-head);}
+
+main{max-width:960px;margin:0 auto;padding:44px 24px;}
+h1{font-family:var(--font-head);font-size:34px;font-weight:800;line-height:1.2;margin-bottom:10px;}
+h1 em{font-style:normal;color:var(--accent);}
+.subtitle{font-size:14px;color:var(--text2);margin-bottom:36px;line-height:1.7;}
+
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:36px;}
+.pill{padding:4px 11px;border-radius:20px;border:1px solid var(--border);
+  font-size:11px;color:var(--text2);font-family:var(--font-head);}
+
+.status-bar{background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;
+  font-size:11px;color:var(--text2);display:flex;align-items:center;gap:8px;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);
+  animation:pulse 2s infinite;}
+.status-dot.offline{background:#ff4d4d;animation:none;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.upload-area{border:2px dashed var(--border2);border-radius:var(--radius);
+  padding:44px 28px;text-align:center;cursor:pointer;transition:all 0.2s;
+  background:var(--surface);margin-bottom:16px;}
+.upload-area:hover,.upload-area.drag{border-color:var(--accent);background:rgba(0,229,160,0.03);}
+.upload-icon{font-size:44px;margin-bottom:14px;display:block;}
+.upload-title{font-family:var(--font-head);font-size:17px;font-weight:700;margin-bottom:6px;}
+.upload-sub{font-size:13px;color:var(--text2);}
+#fileInput{display:none;}
+.upload-btn{margin-top:18px;display:inline-block;padding:10px 22px;border-radius:8px;
+  background:var(--accent);color:#0a0d14;font-family:var(--font-head);font-size:13px;
+  font-weight:700;cursor:pointer;border:none;transition:all 0.15s;}
+.upload-btn:hover{background:#00c98a;}
+
+#loading{display:none;text-align:center;padding:44px;}
+.spinner{width:48px;height:48px;border:3px solid var(--surface3);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin 0.8s linear infinite;margin:0 auto 18px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-steps{margin-top:14px;display:flex;flex-direction:column;gap:8px;align-items:center;}
+.loading-step{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:8px;}
+.loading-step.active{color:var(--accent);}
+.step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+#results{display:none;}
+.verdict-card{border-radius:var(--radius);padding:28px;margin-bottom:20px;
+  border:1px solid var(--border);position:relative;overflow:hidden;}
+.verdict-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.verdict-card.red::before{background:linear-gradient(90deg,var(--red),transparent);}
+.verdict-card.orange::before,.verdict-card.yellow::before{background:linear-gradient(90deg,var(--yellow),transparent);}
+.verdict-card.green::before{background:linear-gradient(90deg,var(--accent),transparent);}
+.verdict-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
+.verdict-icon-big{font-size:38px;}
+.verdict-score-wrap{text-align:right;}
+.verdict-score-num{font-family:var(--font-head);font-size:48px;font-weight:800;line-height:1;}
+.verdict-score-label{font-size:10px;color:var(--text3);font-family:var(--font-head);
+  text-transform:uppercase;letter-spacing:1.5px;}
+.verdict-title{font-family:var(--font-head);font-size:20px;font-weight:800;margin-bottom:3px;}
+.verdict-meta{font-size:11px;color:var(--text2);}
+.score-bar-wrap{margin:14px 0;}
+.score-bar-label{display:flex;justify-content:space-between;font-size:11px;
+  color:var(--text3);margin-bottom:5px;}
+.score-bar{height:7px;border-radius:4px;background:var(--surface3);}
+.score-bar-fill{height:100%;border-radius:4px;transition:width 1s cubic-bezier(0.4,0,0.2,1);}
+.streams-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;}
+.stream-card{background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:14px;}
+.stream-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;
+  color:var(--text3);font-family:var(--font-head);font-weight:600;}
+.stream-score{font-family:var(--font-head);font-size:26px;font-weight:800;margin:5px 0 3px;}
+.stream-signal{font-size:11px;color:var(--text2);line-height:1.5;}
+
+.section-title{font-family:var(--font-head);font-size:13px;font-weight:700;
+  margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.signals-list{display:flex;flex-direction:column;gap:7px;margin-bottom:20px;}
+.signal-item{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:11px 13px;
+  display:flex;gap:10px;align-items:flex-start;}
+.signal-sev{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;
+  font-family:var(--font-head);white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.sev-HIGH{background:rgba(255,77,77,0.15);color:#ff6b6b;}
+.sev-MEDIUM{background:rgba(255,184,48,0.12);color:#ffb830;}
+.sev-OK,.sev-INFO{background:rgba(0,229,160,0.1);color:var(--accent);}
+.signal-name{font-size:13px;font-weight:500;}
+.signal-detail{font-size:11px;color:var(--text2);margin-top:2px;line-height:1.5;}
+
+.meta-table{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);overflow:hidden;margin-bottom:20px;}
+.meta-row{display:grid;grid-template-columns:160px 1fr;
+  border-bottom:1px solid var(--border);}
+.meta-row:last-child{border-bottom:none;}
+.meta-key{padding:9px 13px;font-size:10px;color:var(--text3);
+  font-family:var(--font-head);font-weight:600;text-transform:uppercase;
+  letter-spacing:1px;background:var(--surface2);}
+.meta-val{padding:9px 13px;font-size:12px;}
+
+.heatmap-wrap{margin-bottom:20px;}
+.heatmap-img{width:100%;max-width:380px;border-radius:var(--radius-sm);
+  border:1px solid var(--border);}
+.heatmap-legend{display:flex;gap:8px;margin-top:6px;align-items:center;
+  font-size:11px;color:var(--text3);}
+.legend-bar{height:7px;width:72px;border-radius:4px;
+  background:linear-gradient(90deg,#00e5a0,#ffb830,#ff4d4d);}
+
+.actions-row{display:flex;gap:10px;margin-top:20px;}
+.btn{padding:9px 18px;border-radius:var(--radius-sm);border:none;cursor:pointer;
+  font-family:var(--font-head);font-size:12px;font-weight:700;transition:all 0.15s;}
+.btn-primary{background:var(--accent);color:#0a0d14;}
+.btn-primary:hover{background:#00c98a;}
+.btn-ghost{background:var(--surface2);color:var(--text2);border:1px solid var(--border2);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+
+.error-box{background:rgba(255,77,77,0.08);border:1px solid rgba(255,77,77,0.2);
+  border-radius:var(--radius-sm);padding:14px;color:#ff6b6b;font-size:13px;
+  display:none;margin-top:12px;line-height:1.6;}
+
+@media(max-width:600px){
+  main{padding:20px 14px;}h1{font-size:24px;}
+  .streams-grid{grid-template-columns:1fr;}
+  .verdict-score-num{font-size:36px;}
+  header{padding:16px 20px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Doc<span>Guard</span> AI</div>
+  <div class="badge">Powered by HuggingFace Spaces</div>
+</header>
+
+<main>
+  <h1>Is this document <em>authentic</em>?</h1>
+  <p class="subtitle">
+    Upload any document — PDF, scan, or image. Three neural networks analyse it in parallel:<br>
+    ELA-CNN detects pixel tampering · Metadata MLP catches backdating · Font CRNN finds text swaps.
+  </p>
+
+  <div class="pills">
+    <div class="pill">📅 Date mismatch</div>
+    <div class="pill">🔧 Software fingerprint</div>
+    <div class="pill">🖼 Photo substitution</div>
+    <div class="pill">✏️ Text alteration</div>
+    <div class="pill">🔢 Number tampering</div>
+    <div class="pill">🔁 Double compression</div>
+    <div class="pill">📝 Font inconsistency</div>
+    <div class="pill">🔍 Noise pattern break</div>
+    <div class="pill">👤 Wiped metadata</div>
+    <div class="pill">⚠️ JavaScript in PDF</div>
+  </div>
+
+  <div class="status-bar">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Connecting to DocGuard AI...</span>
+  </div>
+
+  <div class="upload-area" id="uploadArea">
+    <span class="upload-icon">🔍</span>
+    <div class="upload-title">Drop your document here</div>
+    <div class="upload-sub">PDF · JPG · PNG · TIFF — max 50MB</div>
+    <label class="upload-btn" for="fileInput">Choose File</label>
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.bmp"/>
+  </div>
+  <div class="error-box" id="errorBox"></div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div style="font-family:var(--font-head);font-size:13px;color:var(--text2)">
+      Forensic analysis in progress...
+    </div>
+    <div class="loading-steps">
+      <div class="loading-step" id="s1"><span class="step-dot"></span>Extracting metadata &amp; hidden fields</div>
+      <div class="loading-step" id="s2"><span class="step-dot"></span>Running Error Level Analysis (ELA-CNN)</div>
+      <div class="loading-step" id="s3"><span class="step-dot"></span>Analysing noise patterns &amp; compression</div>
+      <div class="loading-step" id="s4"><span class="step-dot"></span>Generating verdict &amp; heatmap</div>
+    </div>
+  </div>
+
+  <div id="results">
+    <div class="verdict-card" id="verdictCard">
+      <div class="verdict-header">
+        <div>
+          <div class="verdict-icon-big" id="vIcon"></div>
+          <div class="verdict-title" id="vTitle"></div>
+          <div class="verdict-meta" id="vMeta"></div>
+        </div>
+        <div class="verdict-score-wrap">
+          <div class="verdict-score-num" id="vScore"></div>
+          <div class="verdict-score-label">Forgery Risk</div>
+        </div>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-label"><span>Authentic</span><span>High Risk</span></div>
+        <div class="score-bar">
+          <div class="score-bar-fill" id="barFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="streams-grid" id="streamsGrid"></div>
+    </div>
+
+    <div class="section-title">⚠️ Detected Signals</div>
+    <div class="signals-list" id="signalsList"></div>
+
+    <div class="section-title">📋 Document Metadata</div>
+    <div class="meta-table" id="metaTable"></div>
+
+    <div class="heatmap-wrap" id="heatmapWrap" style="display:none">
+      <div class="section-title">🗺️ Tampered Region Heatmap</div>
+      <img class="heatmap-img" id="heatmapImg" alt="Forgery heatmap"/>
+      <div class="heatmap-legend">
+        <span>Low risk</span>
+        <div class="legend-bar"></div>
+        <span>High risk</span>
+        <span style="margin-left:8px;color:var(--text2)">Red = likely tampered region</span>
+      </div>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn btn-primary" onclick="downloadReport()">📄 Download Report</button>
+      <button class="btn btn-ghost" onclick="analyzeAnother()">↩ Analyze Another</button>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── Permanent HuggingFace URL ─────────────────────────────────────────────
+const API_URL = "https://pavanusd-docguard-ai-app.hf.space";
+
+let lastResult = null;
+
+// ── Check server on load ──────────────────────────────────────────────────
+async function checkServer() {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  try {
+    const res  = await fetch(`${API_URL}/health`);
+    if (res.ok) {
+      const d = await res.json();
+      text.textContent = `DocGuard AI online · Models loaded · Device: ${d.device || 'cpu'}`;
+      dot.classList.remove('offline');
+    } else { throw new Error(); }
+  } catch {
+    text.textContent = 'Server starting up — please wait 30 seconds and refresh';
+    dot.classList.add('offline');
+    setTimeout(checkServer, 15000);
+  }
+}
+checkServer();
+
+// ── Upload handlers ───────────────────────────────────────────────────────
+const uploadArea = document.getElementById('uploadArea');
+const fileInput  = document.getElementById('fileInput');
+
+uploadArea.addEventListener('click', e => {
+  if (!e.target.classList.contains('upload-btn') && !e.target.closest('label'))
+    fileInput.click();
+});
+uploadArea.addEventListener('dragover', e => {
+  e.preventDefault(); uploadArea.classList.add('drag');
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault(); uploadArea.classList.remove('drag');
+  if (e.dataTransfer.files[0]) analyzeFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) analyzeFile(e.target.files[0]);
+});
+
+// ── Main analysis function ────────────────────────────────────────────────
+async function analyzeFile(file) {
+  lastResult = null;
+  showLoading();
+  hideError();
+
+  const steps = ['s1','s2','s3','s4'];
+  let si = 0;
+  const timer = setInterval(() => {
+    if (si > 0) document.getElementById(steps[si-1])?.classList.remove('active');
+    if (si < steps.length) document.getElementById(steps[si++])?.classList.add('active');
+  }, 2500);
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_URL}/analyze`, {
+      method: 'POST',
+      body: formData
+    });
+
+    clearInterval(timer);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.error || `Server error ${res.status}`);
+    }
+
+    lastResult = await res.json();
+    showResults(lastResult);
+
+  } catch(err) {
+    clearInterval(timer);
+    hideLoading();
+    showError(`Analysis failed: ${err.message}`);
+  }
+}
+
+// ── Render results ────────────────────────────────────────────────────────
+function showResults(data) {
+  hideLoading();
+  document.getElementById('uploadArea').style.display = 'none';
+  document.getElementById('results').style.display    = 'block';
+
+  const risk  = data.forgery_risk_score || 0;
+  const ss    = data.stream_scores || {};
+  const color = risk >= 70 ? 'red' : risk >= 40 ? 'orange' : 'green';
+
+  document.getElementById('verdictCard').className = `verdict-card ${color}`;
+  document.getElementById('vIcon').textContent     = data.verdict_icon  || '🟢';
+  document.getElementById('vTitle').textContent    = data.verdict       || 'Analysis complete';
+  document.getElementById('vMeta').textContent     =
+    `📄 ${data.filename} · ${data.analysis_time}s · ${(data.timestamp||'').slice(0,10)}`;
+
+  const scoreEl = document.getElementById('vScore');
+  scoreEl.textContent = `${risk}/100`;
+  scoreEl.style.color = risk >= 70 ? '#ff4d4d' : risk >= 40 ? '#ffb830' : '#00e5a0';
+
+  const fill = document.getElementById('barFill');
+  fill.style.background = risk >= 70 ? '#ff4d4d' : risk >= 40 ? '#ffb830' : '#00e5a0';
+  setTimeout(() => { fill.style.width = risk + '%'; }, 100);
+
+  // Stream cards
+  document.getElementById('streamsGrid').innerHTML = [
+    ['📋 Metadata', ss.metadata_risk || 0,
+      data.streams?.metadata_analysis?.signals?.[0]?.signal || 'Date, software, author'],
+    ['🖼 Pixel',    ss.pixel_risk    || 0,
+      data.streams?.pixel_analysis?.signal || 'ELA compression analysis'],
+    ['🔊 Noise',    ss.noise_risk    || 0,
+      data.streams?.noise_analysis?.signal || 'Pattern consistency'],
+  ].map(([l,s,sig]) => `
+    <div class="stream-card">
+      <div class="stream-label">${l}</div>
+      <div class="stream-score" style="color:${s>=70?'#ff4d4d':s>=40?'#ffb830':'#00e5a0'}">${s}</div>
+      <div class="stream-signal">${sig}</div>
+    </div>`).join('');
+
+  // Signals
+  const sigs = [
+    ...(data.streams?.metadata_analysis?.signals || []),
+    { severity: (ss.pixel_risk||0)>=40 ? 'MEDIUM' : 'OK',
+      signal: 'Pixel-level ELA analysis',
+      detail: data.streams?.pixel_analysis?.signal || 'No pixel tampering detected' },
+    { severity: (ss.noise_risk||0)>=40 ? 'MEDIUM' : 'OK',
+      signal: 'Noise pattern analysis',
+      detail: data.streams?.noise_analysis?.signal || 'Noise pattern consistent' },
+  ];
+  document.getElementById('signalsList').innerHTML = sigs.map(s => `
+    <div class="signal-item">
+      <span class="signal-sev sev-${s.severity}">${s.severity}</span>
+      <div>
+        <div class="signal-name">${s.signal}</div>
+        <div class="signal-detail">${s.detail || ''}</div>
+      </div>
+    </div>`).join('');
+
+  // Metadata table
+  const f = data.streams?.metadata_analysis?.features || {};
+  document.getElementById('metaTable').innerHTML = [
+    ['Content Date Year', f.content_year  || 'Could not extract'],
+    ['PDF Creation Year', f.creation_year || 'Unknown'],
+    ['Modified Year',     f.modified_year || 'Unknown'],
+    ['Author',            f.author        || '(blank)'],
+    ['Producer Software', f.producer      || 'Unknown'],
+    ['File Hash',         data.file_hash  || '—'],
+    ['Analysis Time',     `${data.analysis_time || 0}s`],
+    ['Timestamp',         data.timestamp  || '—'],
+  ].map(([k,v]) => `
+    <div class="meta-row">
+      <div class="meta-key">${k}</div>
+      <div class="meta-val">${v}</div>
+    </div>`).join('');
+
+  // Heatmap
+  const hm = data.streams?.pixel_analysis?.heatmap;
+  if (hm) {
+    document.getElementById('heatmapWrap').style.display = 'block';
+    document.getElementById('heatmapImg').src = hm;
+  }
+
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Download report ───────────────────────────────────────────────────────
+function downloadReport() {
+  if (!lastResult) return;
+  const r = lastResult;
+  const ss = r.stream_scores || {};
+  const txt = `DocGuard AI — Forensic Analysis Report
+${'='.repeat(52)}
+File:         ${r.filename}
+Analyzed:     ${r.timestamp}
+Time:         ${r.analysis_time}s
+Hash:         ${r.file_hash}
+
+VERDICT: ${r.verdict}
+Forgery Risk: ${r.forgery_risk_score}/100
+
+STREAM SCORES:
+  Metadata:  ${ss.metadata_risk}/100
+  Pixel:     ${ss.pixel_risk}/100
+  Noise:     ${ss.noise_risk}/100
+
+SIGNALS DETECTED:
+${(r.streams?.metadata_analysis?.signals||[])
+  .map(s => `  [${s.severity}] ${s.signal}\n           ${s.detail}`)
+  .join('\n')}
+
+METADATA:
+  Content Year:  ${r.streams?.metadata_analysis?.features?.content_year || 'N/A'}
+  Created:       ${r.streams?.metadata_analysis?.features?.creation_year || 'N/A'}
+  Author:        ${r.streams?.metadata_analysis?.features?.author || '(blank)'}
+  Producer:      ${r.streams?.metadata_analysis?.features?.producer || 'Unknown'}
+
+${'='.repeat(52)}
+Powered by DocGuard AI
+https://pavanusd-docguard-ai-app.hf.space
+`;
+  const a = Object.assign(document.createElement('a'), {
+    href:     URL.createObjectURL(new Blob([txt], {type:'text/plain'})),
+    download: `docguard_report_${r.file_hash}.txt`
+  });
+  a.click();
+}
+
+function analyzeAnother() {
+  document.getElementById('results').style.display    = 'none';
+  document.getElementById('uploadArea').style.display = '';
+  fileInput.value = '';
+  lastResult = null;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function showLoading() {
+  document.getElementById('uploadArea').style.display = 'none';
+  document.getElementById('loading').style.display    = 'block';
+  document.getElementById('results').style.display    = 'none';
+  ['s1','s2','s3','s4'].forEach(id =>
+    document.getElementById(id)?.classList.remove('active'));
+  document.getElementById('s1')?.classList.add('active');
+}
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent   = `⚠️ ${msg}`;
+  b.style.display = 'block';
+  document.getElementById('uploadArea').style.display = '';
+}
+function hideError() { document.getElementById('errorBox').style.display = 'none'; }
+</script>
+</body>
+</html>
